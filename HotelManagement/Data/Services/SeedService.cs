@@ -12,7 +12,7 @@ public class SeedService(
     public async Task SeedDatabaseAsync()
     {
         var adminUserEmail = configuration.GetValue<string>("AdminUser:Email");
-        var adminUserPassword = configuration.GetValue<string>("AdminUser:Password");
+        configuration.GetValue<string>("AdminUser:Password");
 
         var adminUser = await userManager.FindByEmailAsync(adminUserEmail!);
         if (adminUser != null)
@@ -48,9 +48,9 @@ public class SeedService(
             }
         }
 
-        await userManager.AddToRoleAsync(applicationUser, RoleType.Admin.ToString());
+        var response = await userManager.AddToRoleAsync(applicationUser, RoleType.Admin.ToString());
 
-        if (!result.Succeeded)
+        if (!response.Succeeded)
         {
             var errors = string.Join(Environment.NewLine, result.Errors.Select(e => e.Description));
             throw new Exception($"Error in adding user to admin roles. {errors}");
