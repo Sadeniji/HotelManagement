@@ -1,5 +1,6 @@
 ﻿using HotelManagement.Constants;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace HotelManagement.Data.Services;
 
@@ -7,10 +8,18 @@ public class SeedService(
     UserManager<ApplicationUser> userManager,
     IUserStore<ApplicationUser> userStore,
     RoleManager<IdentityRole> roleManager,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    IDbContextFactory<ApplicationDbContext> contextFactory)
 {
     public async Task SeedDatabaseAsync()
     {
+        await using (var context = await contextFactory.CreateDbContextAsync())
+        {
+            if ((await context.Database.GetPendingMigrationsAsync()).Any())
+            {
+                await context.Database.MigrateAsync();
+            }
+        }
         var adminUserEmail = configuration.GetValue<string>("AdminUser:Email");
         configuration.GetValue<string>("AdminUser:Password");
 

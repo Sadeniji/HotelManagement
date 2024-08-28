@@ -2,6 +2,7 @@ using HotelManagement.Components;
 using HotelManagement.Components.Account;
 using HotelManagement.Data;
 using HotelManagement.Data.Services;
+using HotelManagement.Endpoints;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -43,7 +44,8 @@ public class Program
 
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
-        builder.Services.AddTransient<SeedService>();
+        builder.Services.AddTransient<SeedService>()
+                        .AddTransient<IAmenitiesService, AmenitiesService>();
 
         var app = builder.Build();
         await InitializeAdminUser(app.Services);
@@ -70,6 +72,8 @@ public class Program
 
         // Add additional endpoints required by the Identity /Account Razor components.
         app.MapAdditionalIdentityEndpoints();
+
+        app.MapCustomEndpoints();
 
         app.Run();
 

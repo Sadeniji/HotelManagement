@@ -58,6 +58,7 @@
                         <AuthorizeView>
                             <Authorized>
                                 <div class="nav-item dropdown">
+                                    @*<label>@(string.Join(Environment.NewLine, context.User.Claims.Select(c => $"{c.Type}={c.Value}")))</label>*@                                    
                                     <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
                                         @context.User.FindFirst(AppConstants.CustomClaimType.FullName)?.Value
                                     </a>
@@ -72,11 +73,11 @@
                                         <AuthorizeView Roles="Admin" Context="adminContext">
                                             <NavLink href="booking" class="dropdown-item">Manage Staff</NavLink>
                                         </AuthorizeView>
-                                        
+
                                         <AuthorizeView Roles="Staff,Admin" Context="staffAdminContext">
                                             <NavLink href="booking" class="dropdown-item">Manage Bookings</NavLink>
                                             <NavLink href="booking" class="dropdown-item">Manage Rooms</NavLink>
-                                            <NavLink href="booking" class="dropdown-item">Manage Amenities</NavLink>
+                                            <NavLink href="/staff-admin/manage-amenities" class="dropdown-item">Manage Amenities</NavLink>
                                         </AuthorizeView>
                                     </div>
                                 </div>

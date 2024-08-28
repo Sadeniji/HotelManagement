@@ -12,6 +12,13 @@ namespace HotelManagement.Data
         public DbSet<Amenity> Amenities { get; set; }
         public DbSet<RoomTypeAmenity> RoomTypeAmenities { get; set; }
         public DbSet<Booking> Bookings { get; set; }
+
+        //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        //{
+        //    base.OnConfiguring(optionsBuilder);
+        //    optionsBuilder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+        //}
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
