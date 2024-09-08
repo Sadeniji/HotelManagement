@@ -45,7 +45,8 @@ public class Program
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
         builder.Services.AddTransient<SeedService>()
-                        .AddTransient<IAmenitiesService, AmenitiesService>();
+                        .AddTransient<IAmenitiesService, AmenitiesService>()
+                        .AddTransient<IRoomTypeService, RoomTypeService>();
 
         var app = builder.Build();
         await InitializeAdminUser(app.Services);

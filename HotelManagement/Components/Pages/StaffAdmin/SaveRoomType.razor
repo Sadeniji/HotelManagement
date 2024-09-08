@@ -1,0 +1,234 @@
+﻿@page "/staff-admin/manage-room-types/new"
+@page "/staff-admin/manage-room-types/{roomTypeIdRaw}/edit"
+
+@using System.Security.Claims
+
+@rendermode @(new InteractiveServerRenderMode(prerender:false))
+
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IAmenitiesService AmenitiesService
+@inject IRoomTypeService RoomTypeService
+@inject IWebHostEnvironment WebHostEnvironment  
+
+<div class="container">
+    <h1>@(RoomTypeId == Ulid.Empty ? "Create" : "Update") Room Type</h1>
+    <hr/>
+    <EditForm Model="Model" OnValidSubmit="SaveRoomTypeAsync">
+        <DataAnnotationsValidator/>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="mb-3">
+                        <label class="form-label">Name: </label>
+                        <InputText class="form-control" @bind-Value="Model.Name" placeholder="Room type name" />
+                        <ValidationMessage For="() => Model.Name" class="text-danger" />
+                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Price: </label>
+                        <InputNumber class="form-control" @bind-Value="Model.Price" placeholder="Price" />
+                        <ValidationMessage For="() => Model.Price" class="text-danger" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Max Adults: </label>
+                        <InputNumber class="form-control" @bind-Value="Model.MaxAdults" placeholder="Max Adults" />
+                        <ValidationMessage For="() => Model.MaxAdults" class="text-danger" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Max Children: </label>
+                        <InputNumber class="form-control" @bind-Value="Model.MaxChildren" placeholder="Max Children" />
+                        <ValidationMessage For="() => Model.MaxChildren" class="text-danger" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description: </label>
+                        <InputTextArea class="form-control" @bind-Value="Model.Description" placeholder="Description" rows="5" />
+                        <ValidationMessage For="() => Model.Description" class="text-danger" />
+                    </div>
+                    <div class="col-sm-12 d-flex justify-content-between">
+                        @foreach (var amenity in _amenities)
+                        {
+                            <div>
+                                <label>
+                                    <InputCheckbox @bind-Value="amenity.IsChecked" />
+                                    <span>@amenity.Name</span>
+                                    <InputNumber @bind-Value="@amenity.Unit" class="form-control form-control-sm" placeholder="Unit value" />
+                                </label>
+                            </div>
+                        }
+                    </div>
+
+                </div>
+                <div class="col-sm-6">
+                    <div class="d-flex flex-column" style="height: 100%">
+                        <div class="img-wrapper flex-grow-1">
+                            @if (!string.IsNullOrWhiteSpace(_imageUrl))
+                            {
+                                <img src="@_imageUrl" class="img-fluid"/>
+                            }
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Image: </label>
+                            <InputFile OnChange="OnImageSelectAsync" class="form-control"/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                    {
+                        <p class="text-danger">@_errorMessage</p>
+                    }
+                </div>
+                <div class="col-sm-6">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </div>
+            </div>
+>
+    </EditForm>
+</div>
+
+@code {
+    
+    [Parameter]
+    public string? RoomTypeIdRaw { get; set; }
+
+    private Ulid RoomTypeId => string.IsNullOrWhiteSpace(RoomTypeIdRaw) ? Ulid.Empty : Ulid.Parse(RoomTypeIdRaw);
+    private CreateUpdateRoomType Model { get; set; } = new();
+
+    private AmenitySelectionModel[] _amenities = [];
+    private string? _errorMessage;
+    private string? _imageUrl;
+    private IBrowserFile? _image;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var amenities = await AmenitiesService.GetAmenitiesAsync();
+
+        if (RoomTypeId != Ulid.Empty)
+        {
+            var roomType = await RoomTypeService.GetRoomTypeAsync(RoomTypeId);
+            if (roomType == null)
+            {
+                NavigationManager.NavigateTo("/staff-admin/manage-room-types", replace: true);
+                return;
+            }
+
+            Model = roomType;
+            _imageUrl = Model.Image;
+        }
+        _amenities = amenities.Select(a =>
+        {
+            var existingAmenities = Model.Amenities.FirstOrDefault(ma => ma.Id == a.Id);
+            return new AmenitySelectionModel(a.Id, a.Name, existingAmenities is not null, existingAmenities?.Unit);
+        }).ToArray();
+    }
+
+    private async Task SaveRoomTypeAsync(EditContext obj)
+    {
+        _errorMessage = null;
+        if (_image == null)
+        {
+            _errorMessage = "Image is required";
+            return;
+        }
+        Model.Amenities = _amenities.Where(a => a.IsChecked)
+            .Select(a => new CreateUpdateRoomTypeAmenity(a.AmenityId, a.Unit)).ToArray();
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity is null || !authState.User.Identity.IsAuthenticated)
+        {
+            var loginPageUrl = NavigationManager.GetUriWithQueryParameters("Account/Login", new Dictionary<string, object?> { ["ReturnUrl"] = NavigationManager.Uri });
+            NavigationManager.NavigateTo(loginPageUrl);
+            return;
+        }
+        var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)!.Value;
+
+        try
+        {
+            var _existingImageUrl = Model.Image;
+            var imageUrl = await SaveImageAsync();
+            if (imageUrl == null)
+            {
+                return;
+            }
+            Model.Image = imageUrl;
+            var result = await RoomTypeService.CreateRoomTypeAsync(Model, userId);
+            if (result.IsSuccess)
+            {
+                if (!string.IsNullOrWhiteSpace(_existingImageUrl))
+                {
+                    DeleteImage(_existingImageUrl);
+                }
+                NavigationManager.NavigateTo("staff-admin/manage-room-types");
+                return;
+            }
+
+            _errorMessage = result.ErrorMessage ?? "Error in saving room types";
+        }
+        catch (Exception e)
+        {
+            _errorMessage = e.Message;
+        }
+    }
+
+    private class AmenitySelectionModel(Ulid id, string name, bool isChecked, int? unit)
+    {
+        public Ulid AmenityId { get; set; } = id;
+        public string Name { get; set; } = name;
+        public bool IsChecked { get; set; } = isChecked;
+        public int? Unit { get; set; } = unit;
+    }
+
+    private async Task OnImageSelectAsync(InputFileChangeEventArgs obj)
+    {
+        await using var imageStream = obj.File.OpenReadStream();
+        using var ms = new MemoryStream();
+        await imageStream.CopyToAsync(ms);
+
+        var base64ImageData = Convert.ToBase64String(ms.ToArray());
+        var extension = Path.GetExtension(obj.File.Name)[1..];    //Substring(1);
+        _imageUrl = $"data:image/{extension};base64,{base64ImageData}";
+        _image = obj.File;
+    }
+
+    private async Task<string?> SaveImageAsync()
+    {
+        var extension = Path.GetExtension(_image.Name);
+        var imageName = $"room-type-img-{Guid.NewGuid()}{extension}";
+
+        var folderPath = Path.Combine(WebHostEnvironment.WebRootPath, "images", "room-types");
+        Directory.CreateDirectory(folderPath);
+
+        var fullFilePath = Path.Combine(folderPath, imageName);
+        try
+        {
+            await using FileStream fs = new FileStream(fullFilePath, FileMode.Create);
+            await using var imageStream = _image.OpenReadStream();
+            await imageStream.CopyToAsync(fs);
+            return $"/images/room-types/{imageName}";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error in saving image. {ex.Message}";
+            return null;
+        }
+    }
+
+    private void DeleteImage(string imageUrl)
+    {
+        var imagePath = imageUrl.Replace("/", "\\");
+        var fullFilePath = Path.Combine(WebHostEnvironment.WebRootPath, imagePath);
+        if (File.Exists(fullFilePath))
+        {
+            try
+            {
+                File.Delete(fullFilePath);
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+    }
+
+}

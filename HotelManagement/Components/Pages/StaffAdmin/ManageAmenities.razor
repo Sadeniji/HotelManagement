@@ -1,9 +1,7 @@
 ﻿@page "/staff-admin/manage-amenities"
 @using HotelManagement.Data.Entities
-@using Microsoft.AspNetCore.Antiforgery
 
 
-@attribute [Authorize(Roles = "Staff,Admin")]
 @attribute [StreamRendering]
 
 @inject IAmenitiesService AmenitiesService
