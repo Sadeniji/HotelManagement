@@ -30,6 +30,10 @@ namespace HotelManagement.Data
                 .HasMany(rt => rt.Rooms)
                 .WithOne(r => r.RoomType)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            builder.Entity<Room>()
+                .HasIndex(r => r.RoomNumber)
+                .IsUnique();
         }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

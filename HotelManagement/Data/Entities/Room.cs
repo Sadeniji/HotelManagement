@@ -13,7 +13,10 @@ public class Room
 
     [Required, MaxLength(25), Unicode(false)]
     public string RoomNumber { get; set; }
+
     public bool IsAvailable { get; set; }
+
+    public bool IsDeleted { get; set; }
 
     public virtual RoomType RoomType { get; set; }
 }

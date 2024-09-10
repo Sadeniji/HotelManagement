@@ -1,5 +1,4 @@
-﻿using HotelManagement.Constants;
-using HotelManagement.Data.Entities;
+﻿using HotelManagement.Data.Entities;
 using HotelManagement.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +9,9 @@ public interface IRoomTypeService
     Task<MethodResult<Ulid>> CreateRoomTypeAsync(CreateUpdateRoomType model, string userId);
     Task<GetRoomTypesResponse[]> GetRoomTypesAsync();
     Task<CreateUpdateRoomType?> GetRoomTypeAsync(Ulid roomTypeId);
+    Task<Room[]> GetRoomsAsync(Ulid roomTypeId);
+    Task<MethodResult<Room>> CreateRoomAsync(Room room);
+    Task<MethodResult> DeleteRoomAsync(Ulid roomId);
 }
 
 public class RoomTypeService(IDbContextFactory<ApplicationDbContext> contextFactory) : IRoomTypeService
@@ -117,4 +119,78 @@ public class RoomTypeService(IDbContextFactory<ApplicationDbContext> contextFact
 
         return roomType;
     }
+
+    public async Task<Room[]> GetRoomsAsync(Ulid roomTypeId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        return await context.Rooms
+                            .Where(r => r.RoomTypeId == roomTypeId && !r.IsDeleted)
+                            .ToArrayAsync();
+    }
+
+    public async Task<MethodResult<Room>> CreateRoomAsync(Room room)
+    {
+        try
+        {
+            await using var context = await contextFactory.CreateDbContextAsync();
+
+            RoomType? roomType;
+            if (room.Id == Ulid.Empty)
+            {
+                if (await context.Rooms.AnyAsync(r => r.RoomNumber == room.RoomNumber && !r.IsDeleted))
+                {
+                    return MethodResult<Room>.Failure("Room number already exist.");
+                }
+
+                if (await context.Rooms.AnyAsync(r => r.RoomNumber == room.RoomNumber))
+                {
+                    var dbRoom = await context.Rooms.FirstOrDefaultAsync(r => r.RoomNumber == room.RoomNumber);
+                    dbRoom.IsAvailable = room.IsAvailable;
+                    dbRoom.IsDeleted = true;
+                }
+                else
+                {
+                    room.Id = Ulid.NewUlid();
+                    await context.Rooms.AddAsync(room);
+                }
+            }
+            else
+            {
+                var dbRoom = await context.Rooms.FirstOrDefaultAsync(r => r.Id == room.Id && !r.IsDeleted);
+
+                if (dbRoom == null)
+                {
+                    return MethodResult<Room>.Failure($"Room type with id {room.Id} does not exist.");
+                }
+
+                dbRoom.IsAvailable = room.IsAvailable;
+
+            }
+
+            await context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            return MethodResult<Room>.Failure(ex.InnerException?.Message ?? ex.Message);
+        }
+        return MethodResult<Room>.Success(room);
+    }
+
+    public async Task<MethodResult> DeleteRoomAsync(Ulid roomId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        var dbRoom  = await context.Rooms.FirstOrDefaultAsync(r => r.Id == roomId);
+
+        if (dbRoom is null)
+        {
+            return $"Room with id {roomId} is not found.";
+        }
+        dbRoom.IsDeleted = true;
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+
 }
