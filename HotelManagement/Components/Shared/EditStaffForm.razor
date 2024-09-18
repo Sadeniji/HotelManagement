@@ -1,0 +1,105 @@
+﻿@using HotelManagement.Components.Account.Shared
+
+
+@inject IUserService UserService
+@inject ILogger<EditStaffForm> Logger
+
+
+<StatusMessage Message="@_message" />
+<EditForm Model="Input" method="post" OnValidSubmit="EditStaffAsync" FormName="edit-staff" Enhance="true">
+    <DataAnnotationsValidator />
+    <hr />
+    <div class="row">
+        <input type="hidden" value="@Input.Id" name="Input.Id" />
+        <div class="col-sm-6">
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.FirstName" class="form-control" aria-required="true" placeholder="First Name" id="firstname"/>
+                <label for="firstname">First Name</label>
+                <ValidationMessage For="() => Input.FirstName" class="text-danger"/>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.LastName" class="form-control" aria-required="true" placeholder="Last Name" id="lastname"/>
+                <label for="lastname">Last Name</label>
+                <ValidationMessage For="() => Input.LastName" class="text-danger"/>
+            </div>
+        </div>
+
+        <div class="col-sm-6">
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com"/>
+                <label for="email">Email</label>
+                <ValidationMessage For="() => Input.Email" class="text-danger"/>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.ContactNumber" class="form-control" aria-required="true" placeholder="contact number"/>
+                <label for="contactNumber">Contact Number</label>
+                <ValidationMessage For="() => Input.ContactNumber" class="text-danger"/>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Designation" class="form-control" aria-required="true" placeholder="Designation"/>
+                <label for="designation">Designation</label>
+                <ValidationMessage For="() => Input.Designation" class="text-danger"/>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <button type="submit" class="w-100 btn btn-lg btn-primary">Update Staff</button>
+    </div>
+</EditForm>
+
+@code {
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; }
+
+    [Parameter, EditorRequired]
+    public string StaffId { get; set; }
+
+    [Parameter]
+    public EventCallback OnSuccess { get; set; }
+
+    [SupplyParameterFromForm]
+    private EditStaffModel Input { get; set; } = new();
+        
+    private string? _message = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            var model = await UserService.GetStaffMemberAsync(StaffId, default);
+
+            if (model == null)
+            {
+                _message = "Staff member does not exist";
+                return;
+            }
+
+            Input = model;
+        }
+        
+    }
+
+    public async Task EditStaffAsync(EditContext editContext)
+    {
+        var result = await UserService.UpdateUserAsync(Input, default);
+
+        if (!result.IsSuccess)
+        {
+            _message = result.ErrorMessage;
+            return;
+        }
+
+        Logger.LogInformation($"Staff details updated staffId: {StaffId}.");
+
+        await OnSuccess.InvokeAsync();
+    }
+}
+

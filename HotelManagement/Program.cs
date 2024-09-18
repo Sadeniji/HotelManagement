@@ -46,7 +46,8 @@ public class Program
 
         builder.Services.AddTransient<SeedService>()
                         .AddTransient<IAmenitiesService, AmenitiesService>()
-                        .AddTransient<IRoomTypeService, RoomTypeService>();
+                        .AddTransient<IRoomTypeService, RoomTypeService>()
+                        .AddTransient<IUserService, UserService>();
 
         var app = builder.Build();
         await InitializeAdminUser(app.Services);
