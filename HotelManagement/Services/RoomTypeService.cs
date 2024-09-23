@@ -1,8 +1,9 @@
-﻿using HotelManagement.Data.Entities;
+﻿using HotelManagement.Data;
+using HotelManagement.Data.Entities;
 using HotelManagement.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace HotelManagement.Data.Services;
+namespace HotelManagement.Services;
 
 public interface IRoomTypeService
 {

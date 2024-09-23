@@ -1,5 +1,7 @@
 ﻿@page "/"
 
+@inject IRoomsService RoomsService
+
 <PageTitle>Home</PageTitle>
 
 <HomeCarousel />
@@ -7,9 +9,21 @@
 <BookingSmall />
 
 <AboutSection/>
-<RoomsSection />
+<RoomsSection RoomTypes="_rooms" />
 <Video />
 <ServicesSection />
 <Testimonials />
 <Teams />
 <Newsletter/>
+
+@code{
+
+    private const int MaxRoomsDisplayInHomePage = 3;
+    private RoomTypeModel[] _rooms = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _rooms = await RoomsService.GetRoomTypesAsync(MaxRoomsDisplayInHomePage);
+    }
+
+}

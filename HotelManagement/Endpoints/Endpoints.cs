@@ -1,5 +1,5 @@
 ﻿using HotelManagement.Constants;
-using HotelManagement.Data.Services;
+using HotelManagement.Services;
 
 namespace HotelManagement.Endpoints;
 

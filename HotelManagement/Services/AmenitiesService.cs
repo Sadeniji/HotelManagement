@@ -1,9 +1,10 @@
-﻿using HotelManagement.Data.Entities;
+﻿using HotelManagement.Data;
+using HotelManagement.Data.Entities;
 using HotelManagement.Models;
 using Microsoft.EntityFrameworkCore;
 using static System.Net.Mime.MediaTypeNames;
 
-namespace HotelManagement.Data.Services;
+namespace HotelManagement.Services;
 
 public interface IAmenitiesService
 {

@@ -1,8 +1,9 @@
 using HotelManagement.Components;
 using HotelManagement.Components.Account;
 using HotelManagement.Data;
-using HotelManagement.Data.Services;
 using HotelManagement.Endpoints;
+using HotelManagement.Services;
+using HotelManagement.Services.Public;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +48,8 @@ public class Program
         builder.Services.AddTransient<SeedService>()
                         .AddTransient<IAmenitiesService, AmenitiesService>()
                         .AddTransient<IRoomTypeService, RoomTypeService>()
-                        .AddTransient<IUserService, UserService>();
+                        .AddTransient<IUserService, UserService>()
+                        .AddTransient<IRoomsService, RoomsService>();
 
         var app = builder.Build();
         await InitializeAdminUser(app.Services);
@@ -77,8 +79,8 @@ public class Program
 
         app.MapCustomEndpoints();
 
-        app.Run();
-
+        app.Run(); 
+        
         static async Task InitializeAdminUser(IServiceProvider serviceProvider)
         {
             using var scope = serviceProvider.CreateScope();

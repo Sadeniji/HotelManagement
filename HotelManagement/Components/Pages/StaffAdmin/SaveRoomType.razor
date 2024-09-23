@@ -2,6 +2,7 @@
 @page "/staff-admin/manage-room-types/{roomTypeIdRaw}/edit"
 
 @using System.Security.Claims
+@using HotelManagement.Services
 
 @rendermode @(new InteractiveServerRenderMode(prerender:false))
 
@@ -126,7 +127,7 @@
     private async Task SaveRoomTypeAsync(EditContext obj)
     {
         _errorMessage = null;
-        if (_image == null)
+        if (Model.Id == Ulid.Empty && _image == null)
         {
             _errorMessage = "Image is required";
             return;
@@ -146,19 +147,24 @@
 
         try
         {
-            var _existingImageUrl = Model.Image;
-            var imageUrl = await SaveImageAsync();
-            if (imageUrl == null)
+            string? existingImageUrl = null;
+            if (_image != null)
             {
-                return;
+                existingImageUrl = Model.Image;
+                var imageUrl = await SaveImageAsync();
+                if (imageUrl == null)
+                {
+                    return;
+                }
+
+                Model.Image = imageUrl;
             }
-            Model.Image = imageUrl;
             var result = await RoomTypeService.CreateRoomTypeAsync(Model, userId);
             if (result.IsSuccess)
             {
-                if (!string.IsNullOrWhiteSpace(_existingImageUrl))
+                if (!string.IsNullOrWhiteSpace(existingImageUrl))
                 {
-                    DeleteImage(_existingImageUrl);
+                    DeleteImage(existingImageUrl);
                 }
                 NavigationManager.NavigateTo("staff-admin/manage-room-types");
                 return;

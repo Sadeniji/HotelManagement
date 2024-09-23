@@ -1,9 +1,10 @@
 ﻿using HotelManagement.Constants;
+using HotelManagement.Data;
 using HotelManagement.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace HotelManagement.Data.Services;
+namespace HotelManagement.Services;
 
 public interface IUserService
 {
