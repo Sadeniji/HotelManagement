@@ -2,7 +2,7 @@
 
 namespace HotelManagement.Models;
 
-public class EditStaffModel
+public class ProfileModel
 {
     public string Id { get; set; }
     [Required]

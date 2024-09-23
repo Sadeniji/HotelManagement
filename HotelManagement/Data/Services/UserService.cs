@@ -8,9 +8,9 @@ namespace HotelManagement.Data.Services;
 public interface IUserService
 {
     Task<MethodResult<ApplicationUser>> CreateUserAsync(ApplicationUser user, string email, string password);
-    Task<MethodResult> UpdateUserAsync(EditStaffModel model, CancellationToken cancellationToken);
+    Task<MethodResult> UpdateUserProfileAsync(ProfileModel model, RoleType? roleType, CancellationToken cancellationToken);
     Task<PagedResult<UserDisplayModel>> GetUsersAsync(int startIndex, int pageSize, RoleType? roleType = null);
-    Task<EditStaffModel?> GetStaffMemberAsync(string staffId, CancellationToken cancellationToken);
+    Task<ProfileModel?> GetUserProfileDetailsAsync(string userId, CancellationToken cancellationToken);
 }
 
 public class UserService(
@@ -45,9 +45,9 @@ public class UserService(
         return new PagedResult<UserDisplayModel>(total, userRecords);
     }
 
-    public async Task<MethodResult> UpdateUserAsync(EditStaffModel model, CancellationToken cancellationToken)
+    public async Task<MethodResult> UpdateUserProfileAsync(ProfileModel model, RoleType? roleType, CancellationToken cancellationToken)
     {
-        var existingUser = await userManager.Users.FirstOrDefaultAsync(u => u.Id == model.Id, cancellationToken);
+        var existingUser = await GetUser(model.Id, roleType).FirstOrDefaultAsync(cancellationToken);
 
         if (existingUser == null)
         {
@@ -85,21 +85,31 @@ public class UserService(
         return MethodResult.Success();
     }
 
-    public async Task<EditStaffModel?> GetStaffMemberAsync(string staffId, CancellationToken cancellationToken)
+    public async Task<ProfileModel?> GetUserProfileDetailsAsync(string userId, CancellationToken cancellationToken)
     {
-        var staff = await userManager.Users
-                                                   .FirstOrDefaultAsync(u => u.Id == staffId && u.RoleName == RoleType.Staff.ToString(), cancellationToken);
-        return staff == null ? null : new EditStaffModel
-                                    {
-                                        Id = staffId,
-                                        FirstName = staff.FirstName,
-                                        LastName = staff.LastName,
-                                        Email = staff.Email ?? string.Empty,
-                                        Designation = staff.Designation,
-                                        ContactNumber = staff.ContactNumber
-                                    };
+        var user = await userManager.Users
+                                    .FirstOrDefaultAsync(u => u.Id == userId && (u.RoleName == RoleType.Staff.ToString() || 
+                                                         u.RoleName == RoleType.Admin.ToString()), cancellationToken);
+        
+        return user == null ? null : new ProfileModel
+        {
+            Id = userId,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email ?? string.Empty,
+            Designation = user.Designation,
+            ContactNumber = user.ContactNumber
+        };
+        
     }
 
+    private IQueryable<ApplicationUser> GetUser(string userId, RoleType? roleType = null)
+    {
+        var query = userManager.Users.Where(u => u.Id == userId);
+
+        return roleType != null ? query.Where(u => u.RoleName == roleType.ToString()) :  query;
+        
+    }
     public async Task<MethodResult<ApplicationUser>> CreateUserAsync(ApplicationUser user, string email, string password)
     {
         await userStore.SetUserNameAsync(user, email, CancellationToken.None);

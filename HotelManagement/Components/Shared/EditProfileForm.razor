@@ -2,11 +2,11 @@
 
 
 @inject IUserService UserService
-@inject ILogger<EditStaffForm> Logger
+@inject ILogger<EditProfileForm> Logger
 
 
 <StatusMessage Message="@_message" />
-<EditForm Model="Input" method="post" OnValidSubmit="EditStaffAsync" FormName="edit-staff" Enhance="true">
+<EditForm Model="Input" method="post" OnValidSubmit="EditProfileAsync" FormName="edit-staff" Enhance="true">
     <DataAnnotationsValidator />
     <hr />
     <div class="row">
@@ -40,17 +40,24 @@
                 <ValidationMessage For="() => Input.ContactNumber" class="text-danger"/>
             </div>
         </div>
-        <div class="col-sm-6">
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Designation" class="form-control" aria-required="true" placeholder="Designation"/>
-                <label for="designation">Designation</label>
-                <ValidationMessage For="() => Input.Designation" class="text-danger"/>
+        @if (Role.HasValue && Role != RoleType.Guest)
+        {
+            <div class="col-sm-6">
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.Designation" class="form-control" aria-required="true" placeholder="Designation"/>
+                    <label for="designation">Designation</label>
+                    <ValidationMessage For="() => Input.Designation" class="text-danger"/>
+                </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <input type="hidden" value="@Input.Designation" name="Input.Designation"/>
+        }
     </div>
 
     <div>
-        <button type="submit" class="w-100 btn btn-lg btn-primary">Update Staff</button>
+        <button type="submit" class="btn btn-sm btn-primary">Update Profile</button>
     </div>
 </EditForm>
 
@@ -59,14 +66,17 @@
     [CascadingParameter]
     private HttpContext HttpContext { get; set; }
 
+    [Parameter]
+    public RoleType? Role { get; set; }
+
     [Parameter, EditorRequired]
-    public string StaffId { get; set; }
+    public string UserId { get; set; }
 
     [Parameter]
     public EventCallback OnSuccess { get; set; }
 
     [SupplyParameterFromForm]
-    private EditStaffModel Input { get; set; } = new();
+    private ProfileModel Input { get; set; } = new();
         
     private string? _message = null;
 
@@ -74,11 +84,11 @@
     {
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
-            var model = await UserService.GetStaffMemberAsync(StaffId, default);
+            var model = await UserService.GetUserProfileDetailsAsync(UserId, default);
 
             if (model == null)
             {
-                _message = "Staff member does not exist";
+                _message = "User does not exist";
                 return;
             }
 
@@ -87,9 +97,9 @@
         
     }
 
-    public async Task EditStaffAsync(EditContext editContext)
+    public async Task EditProfileAsync(EditContext editContext)
     {
-        var result = await UserService.UpdateUserAsync(Input, default);
+        var result = await UserService.UpdateUserProfileAsync(Input, Role, default);
 
         if (!result.IsSuccess)
         {
@@ -97,7 +107,7 @@
             return;
         }
 
-        Logger.LogInformation($"Staff details updated staffId: {StaffId}.");
+        Logger.LogInformation($"User details updated successfully. UserId: {UserId}.");
 
         await OnSuccess.InvokeAsync();
     }
