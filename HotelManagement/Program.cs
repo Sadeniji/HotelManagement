@@ -7,6 +7,7 @@ using HotelManagement.Services.Public;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 
 namespace HotelManagement;
 
@@ -16,6 +17,7 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        StripeConfiguration.ApiKey = builder.Configuration.GetValue<string>("StripeApiKey");
         // Add services to the container.
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
@@ -49,7 +51,9 @@ public class Program
                         .AddTransient<IAmenitiesService, AmenitiesService>()
                         .AddTransient<IRoomTypeService, RoomTypeService>()
                         .AddTransient<IUserService, UserService>()
-                        .AddTransient<IRoomsService, RoomsService>();
+                        .AddTransient<IRoomsService, RoomsService>()
+                        .AddTransient<IBookingsService, BookingsService>()
+                        .AddTransient<IPaymentService, PaymentService>();
 
         var app = builder.Build();
         await InitializeAdminUser(app.Services);

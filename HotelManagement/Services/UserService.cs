@@ -111,8 +111,14 @@ public class UserService(
         return roleType != null ? query.Where(u => u.RoleName == roleType.ToString()) :  query;
         
     }
+
     public async Task<MethodResult<ApplicationUser>> CreateUserAsync(ApplicationUser user, string email, string password)
     {
+        var existingUser = await userManager.FindByEmailAsync(email);
+        if (existingUser is not null)
+        {
+            return new MethodResult<ApplicationUser>(false, "Email exist already", existingUser);
+        }
         await userStore.SetUserNameAsync(user, email, CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, email, CancellationToken.None);

@@ -9,6 +9,8 @@ public interface IRoomTypeService
 {
     Task<MethodResult<Ulid>> CreateRoomTypeAsync(CreateUpdateRoomType model, string userId);
     Task<GetRoomTypesResponse[]> GetRoomTypesAsync();
+    Task<GetRoomTypesResponse?> GetRoomTypeInfoAsync(Ulid roomTypeId);
+
     Task<CreateUpdateRoomType?> GetRoomTypeAsync(Ulid roomTypeId);
     Task<Room[]> GetRoomsAsync(Ulid roomTypeId);
     Task<MethodResult<Room>> CreateRoomAsync(Room room);
@@ -97,7 +99,14 @@ public class RoomTypeService(IDbContextFactory<ApplicationDbContext> contextFact
             .Select(rt => new GetRoomTypesResponse(rt.Id, rt.Name, rt.Image, rt.Price))
             .ToArrayAsync();
     }
-    
+
+    public async Task<GetRoomTypesResponse?> GetRoomTypeInfoAsync(Ulid roomTypeId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var roomType = await context.RoomTypes.FirstOrDefaultAsync(rt => rt.Id == roomTypeId);
+
+        return roomType == null ? null : new GetRoomTypesResponse(roomType.Id, roomType.Name, roomType.Image, roomType.Price);
+    }
     public async Task<CreateUpdateRoomType?> GetRoomTypeAsync(Ulid roomTypeId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();

@@ -92,10 +92,11 @@
 
         Claim[] additionalClaims = [
             new Claim(AppConstants.CustomClaimType.FullName, user.FullName),
-            new Claim(AppConstants.CustomClaimType.RollName, user.RoleName),
+            new Claim(AppConstants.CustomClaimType.RoleName, user.RoleName),
             new Claim(AppConstants.CustomClaimType.Image, user.Image ?? string.Empty),
             new Claim(AppConstants.CustomClaimType.Email, user.Email ?? user.UserName!),
             new Claim(AppConstants.CustomClaimType.Designation, user.Designation ?? string.Empty),
+            new Claim(AppConstants.CustomClaimType.ContactNumber, user.ContactNumber),
         ];
 
         await SignInManager.SignInWithClaimsAsync(user, Input.RememberMe, additionalClaims);

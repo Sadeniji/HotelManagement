@@ -34,6 +34,11 @@ namespace HotelManagement.Data
             builder.Entity<Room>()
                 .HasIndex(r => r.RoomNumber)
                 .IsUnique();
+
+            builder.Entity<Booking>()
+                .HasOne(b => b.RoomType)
+                .WithOne()
+                .OnDelete(DeleteBehavior.NoAction);
         }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

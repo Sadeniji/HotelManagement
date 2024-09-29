@@ -1,0 +1,8 @@
+﻿@page "/booking-success"
+
+<h3>BookingSuccess</h3>
+
+@code {
+    [SupplyParameterFromQuery(Name = "session-id")]
+    public string CheckoutSessionId { get; set; }
+}

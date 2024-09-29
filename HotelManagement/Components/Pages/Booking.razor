@@ -1,6 +1,18 @@
 ﻿@page "/booking"
+@using HotelManagement.Data
+@using HotelManagement.Services
+
+@rendermode @(new InteractiveServerRenderMode(prerender:false))
 
 @layout InnerPageLayout
+
+@inject NavigationManager NavigationManager
+@inject ILogger<Booking> Logger
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IRoomsService RoomsService
+@inject IUserService UserService
+@inject IBookingsService BookingsService
+@inject IPaymentService PaymentService
 
 <SectionContent SectionName="PageName">Booking</SectionContent>
 
@@ -30,73 +42,146 @@
             </div>
             <div class="col-lg-6">
                 <div class="wow fadeInUp" data-wow-delay="0.2s">
-                    <form>
+                    <EditForm Model="_model" OnValidSubmit="BookRoomAsync">
+                        <DataAnnotationsValidator/>
                         <div class="row g-3">
+                            @if (!_isAuthenticated)
+                            {
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <InputText @bind-Value="_model.FirstName" class="form-control" aria-required="true" placeholder="First Name" id="firstname" />
+                                        <label for="firstname">First Name</label>
+                                    </div>
+                                    <ValidationMessage For="() => _model.FirstName" class="text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <InputText @bind-Value="_model.LastName" class="form-control" aria-required="true" placeholder="Last Name" id="lastname" />
+                                        <label for="lastname">Last Name</label>
+                                    </div>
+                                    <ValidationMessage For="() => _model.LastName" class="text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <InputText @bind-Value="_model.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                                        <label for="email">Email</label>
+                                    </div>
+                                    <ValidationMessage For="() => _model.Email" class="text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <InputText @bind-Value="_model.ContactNumber" class="form-control" aria-required="true" placeholder="contact number" />
+                                        <label for="contactNumber">Contact Number</label>
+                                    </div>
+                                    <ValidationMessage For="() => _model.ContactNumber" class="text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <InputText type="password" @bind-Value="_model.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                                        <label for="password">Password</label>
+                                    </div>
+                                    <ValidationMessage For="() => _model.Password" class="text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <InputText type="password" @bind-Value="_model.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password"/>
+                                        <label for="confirm-password">Confirm Password</label>
+                                    </div>
+                                    <ValidationMessage For="() => _model.ConfirmPassword" class="text-danger"/>
+                                </div>
+                            }
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <input type="text" class="form-control" id="name" placeholder="Your Name">
-                                    <label for="name">Your Name</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="email" class="form-control" id="email" placeholder="Your Email">
-                                    <label for="email">Your Email</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating date" id="date3" data-target-input="nearest">
-                                    <input type="text" class="form-control datetimepicker-input" id="checkin" placeholder="Check In" data-target="#date3" data-toggle="datetimepicker" />
+                                    <InputDate @bind-Value="_model.CheckInDate" min="@MinDateString"
+                                               class=" form-control" id="checkin" placeholder="Check in"/>
                                     <label for="checkin">Check In</label>
                                 </div>
+                                <ValidationMessage For="() => _model.CheckInDate" class="text-danger" />
                             </div>
                             <div class="col-md-6">
-                                <div class="form-floating date" id="date4" data-target-input="nearest">
-                                    <input type="text" class="form-control datetimepicker-input" id="checkout" placeholder="Check Out" data-target="#date4" data-toggle="datetimepicker" />
+                                <div class="form-floating date">
+                                    <InputDate @bind-Value="_model.CheckOutDate" min="@MinDateString"
+                                               class="form-control" id="checkout" placeholder="Check Out" />
                                     <label for="checkout">Check Out</label>
                                 </div>
+                                <ValidationMessage For="() => _model.CheckOutDate" class="text-danger" />
                             </div>
+                            @* <div class="col-md-6">
+                                <div class="form-floating date" id="date3" data-target-input="nearest">
+                                    <InputDate @bind-Value="_model.CheckInDate" min="@MinDateString"
+                                               class=" form-control datetimepicker-input" id="checkin" placeholder="Check in" data-target="#date3" data-toggle="datetimepicker" />
+                                    <label for="checkin">Check In</label>
+                                </div>
+                                <ValidationMessage For="() => _model.CheckInDate" class="text-danger"/>
+                            </div> *@
+@*                             <div class="col-md-6">
+                                <div class="form-floating date" id="date4" data-target-input="nearest">
+                                    <InputDate @bind-Value="_model.CheckOutDate" min="@MinDateString"
+                                               class="form-control datetimepicker-input" id="checkout" placeholder="Check Out" data-target="#date4" data-toggle="datetimepicker"/>
+                                    <label for="checkout">Check Out</label>
+                                </div>
+                                <ValidationMessage For="() => _model.CheckOutDate" class="text-danger"/>
+                            </div>
+ *@                            
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <select class="form-select" id="select1">
-                                        <option value="1">Adult 1</option>
-                                        <option value="2">Adult 2</option>
-                                        <option value="3">Adult 3</option>
-                                    </select>
+                                    <InputSelect ValueExpression="() => _model.NumberOfAdults"
+                                                 ValueChanged="(int? newAdultNumber) => HandleAdultsChange(newAdultNumber)"
+                                        class="form-select" id="select1">
+                                        @for (int i = 0; i < 6; i++)
+                                        {
+                                            <option value="@i">@i Adult(s)</option>
+                                        }
+                                    </InputSelect>
                                     <label for="select1">Select Adult</label>
                                 </div>
+                                <ValidationMessage For="() => _model.NumberOfAdults" class="text-danger"/>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-floating">
-                                    <select class="form-select" id="select2">
-                                        <option value="1">Child 1</option>
-                                        <option value="2">Child 2</option>
-                                        <option value="3">Child 3</option>
-                                    </select>
+                                    <InputSelect ValueExpression="() => _model.NumberOfChildren"
+                                                 ValueChanged="(int? newChildrenNumber) => HandleChildrenChange(newChildrenNumber)"
+                                        class="form-select" id="select2">
+                                        @for (int i = 0; i < 6; i++)
+                                        {
+                                            <option value="@i">@i @(i > 1 ? "Children" : "Child")</option>
+                                        }
+                                    </InputSelect>
                                     <label for="select2">Select Child</label>
                                 </div>
+                                <ValidationMessage For="() => _model.NumberOfChildren" class="text-danger"/>
                             </div>
                             <div class="col-12">
                                 <div class="form-floating">
-                                    <select class="form-select" id="select3">
-                                        <option value="1">Room 1</option>
-                                        <option value="2">Room 2</option>
-                                        <option value="3">Room 3</option>
-                                    </select>
+                                    <InputSelect ValueExpression="() => _model.RoomTypeId"
+                                                 ValueChanged="(Ulid newRoomTypeId) => HandleRoomTypeChange(newRoomTypeId)"
+                                                 class="form-select" id="select3">
+                                        <option value="@Ulid.Empty">Select Room</option>
+                                        @foreach (var roomType in _roomTypes)
+                                        {
+                                            <option value="@roomType.Id">@roomType.Name - @roomType.AdditionalData</option>
+                                        }
+                                    </InputSelect>
                                     <label for="select3">Select A Room</label>
                                 </div>
+                                <ValidationMessage For="() => _model.RoomTypeId" class="text-danger" />
                             </div>
                             <div class="col-12">
                                 <div class="form-floating">
-                                    <textarea class="form-control" placeholder="Special Request" id="message" style="height: 100px"></textarea>
+                                    <InputTextArea @bind-Value="_model.SpecialRequest" class="form-control" placeholder="Special Request" id="message" style="height: 100px"></InputTextArea>
                                     <label for="message">Special Request</label>
                                 </div>
+                            </div>
+                            <div class="col-12">
+                                <p>
+                                    <strong>Total Amount: @TotalAmount.ToString("c")</strong>
+                                </p>
                             </div>
                             <div class="col-12">
                                 <button class="btn btn-primary w-100 py-3" type="submit">Book Now</button>
                             </div>
                         </div>
-                    </form>
+                    </EditForm>
                 </div>
             </div>
         </div>
@@ -104,5 +189,158 @@
 </div>
 <!-- Booking End -->
 @code {
+    [SupplyParameterFromQuery(Name = "room-type")]
+    public string? SelectedRoomType { get; set; }
 
+
+    private BookingModel _model = new();
+    private decimal _price = 0;
+
+    private bool _isAuthenticated;
+    private string? _userId;
+    private string? _errorMessage;
+    private DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+    private string MinDateString => today.ToString("yyyy-MM-dd");
+
+    private int NumberOfDays => _model.CheckOutDate.DayNumber - _model.CheckInDate.DayNumber;
+    public decimal TotalAmount => NumberOfDays * _price;
+
+    private LookupModel<Ulid, decimal>[] _roomTypes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var roomTypesTask = RoomsService.GetRoomTypesLookup();
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            // user is logged in
+            // fetch use details from AuthState claims
+            _isAuthenticated = true;
+            _userId = authState.User.GetUserId();
+            _model.SetDummyValues();
+        }
+
+        _roomTypes = await roomTypesTask;
+
+        if (!string.IsNullOrWhiteSpace(SelectedRoomType) 
+            && Ulid.TryParse(SelectedRoomType, out Ulid roomTypeId) 
+            && roomTypeId != Ulid.Empty)
+        {
+            HandleRoomTypeChange(roomTypeId);
+        }
+    }
+
+    private FilterModel _filterModel = new();
+
+    private void HandleRoomTypeChange(Ulid newRoomTypeId)
+    {
+        _model.RoomTypeId = newRoomTypeId;
+        _price = _roomTypes.FirstOrDefault(rt => rt.Id == newRoomTypeId).AdditionalData;
+    }
+
+    private async Task HandleChildrenChange(int? newChildrenNumber)
+    {
+        _model.NumberOfChildren = newChildrenNumber;
+        _filterModel.NumberOfChildren = _model.NumberOfChildren;
+        await FilterRoomTypes();
+    }
+
+    private async Task HandleAdultsChange(int? newAdultNumber)
+    {
+        _model.NumberOfAdults = newAdultNumber;
+        _filterModel.NumberOfAdults = _model.NumberOfAdults;
+        await FilterRoomTypes();
+    }
+
+    private async Task FilterRoomTypes()
+    {
+        _roomTypes = await RoomsService.GetRoomTypesLookup(_filterModel);
+    }
+
+    private async Task BookRoomAsync()
+    {
+        string? userId = _userId;
+        if (!_isAuthenticated)
+        {
+            // Register this user as a guest
+            userId = await RegisterUserAsync();
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return;
+            }
+        }
+
+        // Create a booking
+        var bookingId = await MakeBooking(userId!);
+
+        if (bookingId is null)
+        {
+            return;
+        }
+
+        // Redirect user to stripe page
+        await PayNowAsync(userId!);
+    }
+
+    private async Task<string?> RegisterUserAsync()
+    {
+        var user = CreateUser();
+
+        user.FirstName = _model.FirstName;
+        user.LastName = _model.LastName;
+        user.ContactNumber = _model.ContactNumber;
+        user.RoleName = RoleType.Guest.ToString();
+
+        var result = await UserService.CreateUserAsync(user, _model.Email, _model.Password);
+
+       
+        if (!result.IsSuccess && string.IsNullOrWhiteSpace(result.Data.Id))
+        {
+            _errorMessage = result.ErrorMessage;
+            return null;
+        }
+
+        return result.Data.Id;
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<ApplicationUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                                                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private async Task<Ulid?> MakeBooking(string userId)
+    {
+        _model.Amount = TotalAmount;
+        var result = await BookingsService.MakeBookingAsync(_model, userId);
+
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.ErrorMessage;
+            return null;
+        }
+
+        return result.Data;
+    }
+
+    private async Task PayNowAsync(string userId)
+    {
+        var domain = NavigationManager.BaseUri.TrimEnd('/');
+        var roomTypeName = _roomTypes.First(rt => rt.Id == _model.RoomTypeId).Name;
+
+        var paymentModel = new PaymentModel(roomTypeName, NumberOfDays, _price);
+        var paymentUrl = await PaymentService.GeneratePaymentUrl(paymentModel, userId, domain);
+
+        NavigationManager.NavigateTo(paymentUrl);
+    }
 }
