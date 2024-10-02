@@ -282,7 +282,7 @@
         }
 
         // Redirect user to stripe page
-        await PayNowAsync(userId!);
+        await PayNowAsync(bookingId.Value);
     }
 
     private async Task<string?> RegisterUserAsync()
@@ -333,13 +333,13 @@
         return result.Data;
     }
 
-    private async Task PayNowAsync(string userId)
+    private async Task PayNowAsync(Ulid bookingId)
     {
         var domain = NavigationManager.BaseUri.TrimEnd('/');
         var roomTypeName = _roomTypes.First(rt => rt.Id == _model.RoomTypeId).Name;
 
-        var paymentModel = new PaymentModel(roomTypeName, NumberOfDays, _price);
-        var paymentUrl = await PaymentService.GeneratePaymentUrl(paymentModel, userId, domain);
+        var paymentModel = new PaymentModel(bookingId, roomTypeName, NumberOfDays, _price);
+        var paymentUrl = await PaymentService.GeneratePaymentUrl(paymentModel, _userId, domain);
 
         NavigationManager.NavigateTo(paymentUrl);
     }

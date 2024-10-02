@@ -1,0 +1,13 @@
+﻿@page "/bookings/{bookingId}/cancel"
+
+@layout InnerPageLayout
+ 
+<h3>BookingCancel</h3>
+
+@code {
+    [Parameter]
+    public Ulid BookingId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "payment-id")]
+    public Ulid PaymentId { get; set; }
+}

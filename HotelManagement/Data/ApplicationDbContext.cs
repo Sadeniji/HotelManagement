@@ -12,6 +12,7 @@ namespace HotelManagement.Data
         public DbSet<Amenity> Amenities { get; set; }
         public DbSet<RoomTypeAmenity> RoomTypeAmenities { get; set; }
         public DbSet<Booking> Bookings { get; set; }
+        public DbSet<Payment> Payments { get; set; }
 
         //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         //{
@@ -37,7 +38,12 @@ namespace HotelManagement.Data
 
             builder.Entity<Booking>()
                 .HasOne(b => b.RoomType)
-                .WithOne()
+                .WithMany()
+                .OnDelete(DeleteBehavior.NoAction);
+
+            builder.Entity<Payment>()
+                .HasOne(b => b.Booking)
+                .WithMany()
                 .OnDelete(DeleteBehavior.NoAction);
         }
 
