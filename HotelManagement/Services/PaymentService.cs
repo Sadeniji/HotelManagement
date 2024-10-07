@@ -12,6 +12,7 @@ public interface IPaymentService
 {
     Task<string> GeneratePaymentUrl(PaymentModel model, string userId, string domain);
     Task<MethodResult<string?>> ConfirmPaymentAsync(Ulid paymentId, Ulid bookingId, string checkoutSessionId);
+    Task<MethodResult> CancelPaymentAsync(Ulid paymentId, Ulid bookingId, string checkoutSessionId);
 }
 
 public class PaymentService(IDbContextFactory<ApplicationDbContext> contextFactory, UserManager<ApplicationUser> userManager) : IPaymentService
@@ -59,7 +60,7 @@ public class PaymentService(IDbContextFactory<ApplicationDbContext> contextFacto
             LineItems = lineItems.ToList(),
             Mode = "payment",
             SuccessUrl = $"{domain}/bookings/{model.BookingId.ToString()}" + "/success?session-id={CHECKOUT_SESSION_ID}&payment-id="+paymentEntity.Id,
-            CancelUrl = $"{domain}/bookings/{model.BookingId.ToString()}/cancel?payment-id={paymentEntity.Id}"
+            CancelUrl = $"{domain}/bookings/{model.BookingId.ToString()}/cancel?session-id={{CHECKOUT_SESSION_ID}}&payment-id={paymentEntity.Id}"
         };
         var sessionService = new SessionService();
 
@@ -118,5 +119,43 @@ public class PaymentService(IDbContextFactory<ApplicationDbContext> contextFacto
         var guessName = user?.FullName ?? string.Empty;
 
         return new MethodResult<string?>(true, null, guessName);
+    }
+
+    public async Task<MethodResult> CancelPaymentAsync(Ulid paymentId, Ulid bookingId, string checkoutSessionId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var paymentEntity = await context.Payments.FirstOrDefaultAsync(p => p.Id == paymentId && p.CheckOutSessionId == checkoutSessionId);
+
+        if (paymentEntity == null)
+        {
+            return new MethodResult(false, "Invalid payment id");
+        }
+
+        var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+
+        if (booking is null)
+        {
+            return new MethodResult(false, "Invalid booking id");
+        }
+
+        if (paymentEntity.Status == StripePaymentInitiated)
+        {
+            var sessionService = new SessionService();
+            var checkoutSession = await sessionService.GetAsync(checkoutSessionId);
+
+            if (checkoutSession == null)
+            {
+                return new MethodResult(false, "Invalid Checkout session");
+            }
+
+            paymentEntity.Status = "cancelled";
+            paymentEntity.AdditionalInfo = "Payment cancelled by guest";
+
+            booking.Status = BookingStatus.PaymentCancelled;
+
+            await context.SaveChangesAsync();
+        }
+
+        return true;
     }
 }

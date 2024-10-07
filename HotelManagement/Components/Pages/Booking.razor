@@ -177,6 +177,12 @@
                                     <strong>Total Amount: @TotalAmount.ToString("c")</strong>
                                 </p>
                             </div>
+                            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                            {
+                                <div class="col-12">
+                                    <p class="text-danger">@_errorMessage</p>
+                                </div>
+                            }
                             <div class="col-12">
                                 <button class="btn btn-primary w-100 py-3" type="submit">Book Now</button>
                             </div>
@@ -187,7 +193,11 @@
         </div>
     </div>
 </div>
-<!-- Booking End -->
+
+@if (_isLoading)
+{
+    <Loader LoadingText="@_loadingText"/>
+}
 @code {
     [SupplyParameterFromQuery(Name = "room-type")]
     public string? SelectedRoomType { get; set; }
@@ -201,6 +211,8 @@
     private string? _errorMessage;
     private DateOnly today = DateOnly.FromDateTime(DateTime.Now);
     private string MinDateString => today.ToString("yyyy-MM-dd");
+    private bool _isLoading;
+    private string? _loadingText;
 
     private int NumberOfDays => _model.CheckOutDate.DayNumber - _model.CheckInDate.DayNumber;
     public decimal TotalAmount => NumberOfDays * _price;
@@ -236,6 +248,7 @@
 
     private void HandleRoomTypeChange(Ulid newRoomTypeId)
     {
+        _errorMessage = string.Empty;
         _model.RoomTypeId = newRoomTypeId;
         _price = _roomTypes.FirstOrDefault(rt => rt.Id == newRoomTypeId).AdditionalData;
     }
@@ -261,28 +274,43 @@
 
     private async Task BookRoomAsync()
     {
-        string? userId = _userId;
-        if (!_isAuthenticated)
+        _errorMessage = string.Empty;
+        try
         {
-            // Register this user as a guest
-            userId = await RegisterUserAsync();
+            _loadingText = "Processing";
+            _isLoading = true;
 
-            if (string.IsNullOrWhiteSpace(userId))
+            string? userId = _userId;
+            if (!_isAuthenticated)
             {
+                // Register this user as a guest
+                userId = await RegisterUserAsync();
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    _isLoading = false;
+                    return;
+                }
+            }
+
+            // Create a booking
+            var bookingId = await MakeBooking(userId!);
+
+            if (bookingId is null)
+            {
+                _isLoading = false;
                 return;
             }
+
+            // Redirect user to stripe page
+            await PayNowAsync(bookingId.Value);
         }
-
-        // Create a booking
-        var bookingId = await MakeBooking(userId!);
-
-        if (bookingId is null)
+        catch (Exception ex)
         {
-            return;
+            _errorMessage = ex.Message;
+            _isLoading = false;
         }
-
-        // Redirect user to stripe page
-        await PayNowAsync(bookingId.Value);
+        
     }
 
     private async Task<string?> RegisterUserAsync()

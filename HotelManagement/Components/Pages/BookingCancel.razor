@@ -1,13 +1,45 @@
 ﻿@page "/bookings/{bookingId}/cancel"
+@using HotelManagement.Services
 
 @layout InnerPageLayout
  
-<h3>BookingCancel</h3>
+@inject IPaymentService PaymentService
+
+<div class="container d-flex justify-content-center mt-5">
+    <div>
+        @if (_errorMessage == null)
+        {
+            <p>Your payment is cancelled.</p>
+        }
+        else
+        {
+            <p class="text-danger">@_errorMessage</p>
+        }
+    </div>
+</div>
 
 @code {
     [Parameter]
-    public Ulid BookingId { get; set; }
+    public string BookingId { get; set; }
 
     [SupplyParameterFromQuery(Name = "payment-id")]
-    public Ulid PaymentId { get; set; }
+    public string PaymentId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "session-id")]
+    public string CheckoutSessionId { get; set; }
+
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var isBookingIdValid = Ulid.TryParse(BookingId, out var bookingId);
+        var isPaymentIdValid = Ulid.TryParse(PaymentId, out var paymentId);
+
+        if (!isBookingIdValid && !isPaymentIdValid)
+        {
+            return;
+        }
+        var result = await PaymentService.CancelPaymentAsync(paymentId, bookingId, CheckoutSessionId);
+    }
+
 }
