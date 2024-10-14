@@ -9,6 +9,9 @@ namespace HotelManagement.Services;
 public interface IBookingsService
 {
     Task<MethodResult<Ulid>> MakeBookingAsync(BookingModel bookingModel, string userId);
+    Task<PagedResult<GetBookingModel>> GetBookingsAsync(int startIndex, int pageSize);
+    Task<MethodResult> ApproveBookingAsync(Ulid bookingId);
+    Task<MethodResult> CancelBookingAsync(Ulid bookingId, string reason);
 }
 public class BookingsService(IDbContextFactory<ApplicationDbContext> contextFactory, IRoomTypeService roomTypeService, ILogger<BookingsService> logger) : IBookingsService
 {
@@ -52,5 +55,91 @@ public class BookingsService(IDbContextFactory<ApplicationDbContext> contextFact
         {
             return MethodResult<Ulid>.Failure(ex.Message);
         }
+    }
+
+    public async Task<PagedResult<GetBookingModel>> GetBookingsAsync(int startIndex, int pageSize)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var query = context.Bookings;
+
+        var totalCount = await query.CountAsync();
+
+        var bookings = await query.OrderByDescending(b => b.CheckInDate)
+                                                  .Select(b => new GetBookingModel
+                                                  {
+                                                      Id = b.Id,
+                                                      GuestId = b.GuestId,
+                                                      GuestName = b.Guest.FullName,
+                                                      RoomTypeId = b.RoomTypeId,
+                                                      RoomTypeName = b.RoomType.Name,
+                                                      SpecialRequest = b.SpecialRequest,
+                                                      Status = b.Status,
+                                                      BookedOn = b.BookedOn,
+                                                      RoomId = b.RoomId,
+                                                      RoomNumber = (b.RoomId == null || b.RoomId == Ulid.Empty) ? "" : b.Room.RoomNumber,
+                                                      Adult = b.Adult,
+                                                      Children = b.Children,
+                                                      CheckInDate = b.CheckInDate,
+                                                      CheckOutDate = b.CheckOutDate,
+                                                      Remarks = b.Remarks,
+                                                      TotalAmount = b.TotalAmount
+                                                  })
+                                                  .Skip(startIndex)
+                                                  .Take(pageSize)
+                                                  .ToArrayAsync();
+
+        return new PagedResult<GetBookingModel>(totalCount, bookings);
+    }
+
+    public async Task<MethodResult> ApproveBookingAsync(Ulid bookingId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+
+        if (booking is null)
+        {
+            return "Invalid request";
+        }
+
+        switch (booking.Status)
+        {
+            case BookingStatus.Booked:
+                return "Already booked";
+            case BookingStatus.Cancelled:
+                return "Booking is cancelled.";
+            case BookingStatus.PaymentSuccess:
+                booking.Status = BookingStatus.Booked;
+                booking.ModifiedOn = DateTime.UtcNow;
+                break;
+            default:
+                return "Booking can be approved only after payment.";
+        }
+
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<MethodResult> CancelBookingAsync(Ulid bookingId, string reason)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+
+        if (booking is null)
+        {
+            return "Invalid request";
+        }
+
+        if (booking.Status == BookingStatus.Cancelled)
+        {
+            return "Already cancelled.";
+        }
+
+        booking.Status = BookingStatus.Cancelled;
+        booking.Remarks += Environment.NewLine + $"Cancelled by Staff/Admin. Reason: {reason}";
+        booking.ModifiedOn = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+        return true;
     }
 }

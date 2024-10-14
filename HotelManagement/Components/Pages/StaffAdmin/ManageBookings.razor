@@ -1,0 +1,218 @@
+﻿@page "/staff-admin/manage-bookings"
+@using HotelManagement.Data.Entities
+@using HotelManagement.Services
+@using Microsoft.AspNetCore.Components.QuickGrid
+
+@rendermode @(new InteractiveServerRenderMode(prerender:false))
+
+@inject IBookingsService BookingService
+@inject IRoomTypeService RoomTypeService
+@inject IJSRuntime JsRuntime
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1>Manage Bookings</h1>
+    </div>
+    <hr/>
+    <div class="table-responsive">
+        <QuickGrid ItemsProvider="_bookingsProvider" @ref="_bookingsGrid" Pagination="_paginationState" Class="table table-striped">
+            <PropertyColumn Property="b => b.Id"/>     
+            <PropertyColumn Property="b => b.RoomTypeName" Title="Room Type"/>
+            <TemplateColumn Title="Room Number">
+                @if (context.RoomId == null || context.RoomId == Ulid.Empty)
+                {
+@*                     <label class="d-block">No Room Assigned</label>
+ *@
+                    @if (context.IsRoomNumberAssigned)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenAssignRoomModalAsync(context)">Assign</button>
+                    }
+                    else
+                    {
+@*                         <small mt-2 ms-1>Room assignable after payment.</small>
+ *@                        <span class="badge bg-secondary">Unassign</span>
+                    }
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenAssignRoomModalAsync(context)">@context.RoomNumber</button>
+                }
+            </TemplateColumn>
+            <PropertyColumn Property="b => b.GuestName" Title="Guest"/>
+            <PropertyColumn Property="b => b.BookedOn" Title="Booked On" Format="dd-MM-yy hh:mm:ss"/>
+            <PropertyColumn Property="b => b.CheckInDate" Title="Check-in" Format="dd-MM-yy"/>
+            <PropertyColumn Property="b => b.CheckOutDate" Title="Check-out" Format="dd-MM-yy"/>
+            <PropertyColumn Property="b => b.Adult"/>
+            <PropertyColumn Property="b => b.Children"/>
+            <PropertyColumn Property="b => b.SpecialRequest" Title="Special Request"/>
+            <PropertyColumn Property="b => b.Status"/>
+            <PropertyColumn Property="b => b.Remarks" Class="remark-column"/>
+            <TemplateColumn Class="grid-action-column">
+                <button type="button" class="btn btn-sm btn-success" 
+                        disabled="@(!context.CanBeApproved)"
+                        @onclick="() => ApproveBookingAsync(context)">Approve</button>
+                <button type="button" class="btn btn-sm btn-danger" 
+                        disabled="@(!context.CanBeCancelled)" @onclick="() => CancelBookingAsync(context)">Cancel</button>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+    <Paginator State="_paginationState"/>
+</div>
+@if (_isLoading)
+{
+    <Loader LoadingText="Fetching bookings"/>
+}
+
+<DialogComponent DialogId="assign-room-to-booking"
+                 Show="_bookingModel != null"
+                 Title="Assign/Change Room to Booking"
+                 OnCloseModal="HandleAssignRoomModalClose">
+    <div>
+        <div class="mb-3">
+            <label class="form-label">Room Number: </label>
+            <select @bind="_selectedRoomId" class="form-control form-control-sm">
+                <option value="0">Select Room</option>
+                @foreach (var room in _rooms)
+                {
+                    <option value="@room.Id">@room.RoomNumber</option>
+                }
+            </select>
+        </div>
+        <div class="mb-3">
+            <button type="button" class="btn btn-primary btn-sm" @onclick="AssignRoomAsync">Save</button>
+        </div>
+    </div>
+</DialogComponent>
+
+<style type="text/css" scoped>
+    .grid-action-column {
+        min-width: 190px;
+    }
+
+    .remark-column {
+        min-width: 240px;
+    }
+</style>
+@code {
+    private int currentRowIndex = 0; // Initialize the row index
+    private bool _isLoading;
+    private GridItemsProvider<GetBookingModel>? _bookingsProvider;
+    private QuickGrid<GetBookingModel> _bookingsGrid;
+    private const int PageSize = 10;
+
+    private PaginationState _paginationState = new PaginationState { ItemsPerPage = PageSize };
+
+    private Room[] _rooms = [];
+    private GetBookingModel? _bookingModel;
+    //private Ulid _bookingId;
+    private Ulid _selectedRoomId;
+
+    protected override void OnInitialized()
+    {
+        _bookingsProvider = async (GridItemsProviderRequest<GetBookingModel> request) =>
+        {
+            _isLoading = true;
+            StateHasChanged();
+            
+            // fetch booking from db
+            var result = await BookingService.GetBookingsAsync(request.StartIndex, request.Count ?? PageSize);
+            _isLoading = false;
+            StateHasChanged();
+            return GridItemsProviderResult.From<GetBookingModel>(result.Records, result.TotalCount);
+        };
+    }
+
+    private async Task OpenAssignRoomModalAsync(GetBookingModel booking)
+    {
+        var rooms = await RoomTypeService.GetRoomsAsync(booking.RoomTypeId);
+
+        if (!(rooms?.Any() ?? false))
+        {
+            await AlertAsync("There are no rooms for this room type");
+            return;
+        }
+
+        if (!rooms.Any(r => r.IsAvailable))
+        {
+            await AlertAsync("There are no rooms available for this room type.");
+            return;
+        }
+
+        _rooms = rooms.Where(r => r.IsAvailable).ToArray();
+        _bookingModel = booking;
+    }
+
+    private async Task AlertAsync(string message) => await JsRuntime.InvokeVoidAsync("window.alert", message);
+    private async Task<bool> ConfirmAsync(string message) => await JsRuntime.InvokeAsync<bool>("window.confirm", message);
+
+    private void HandleAssignRoomModalClose()
+    {
+        _rooms = [];
+        _bookingModel = null;
+        _selectedRoomId = Ulid.Empty;
+    }
+
+    private async Task AssignRoomAsync()
+    {
+        if (_bookingModel != null && _selectedRoomId != Ulid.Empty)
+        {
+            var result = await RoomTypeService.AssignRoomToBookingAsync(_bookingModel.Id, _selectedRoomId);
+
+            if (!result.IsSuccess)
+            {
+                await AlertAsync($"Error in assigning/changing room. {result.ErrorMessage}");
+                return;
+            }
+
+            // _bookingModel.RoomId = _selectedRoomId;
+            // _bookingModel.RoomNumber = _rooms.FirstOrDefault(r => r.Id == _selectedRoomId).RoomNumber;
+            HandleAssignRoomModalClose();
+            await _bookingsGrid.RefreshDataAsync();
+        }
+    }
+
+    private async Task ApproveBookingAsync(GetBookingModel booking)
+    {
+        if (booking.CanBeApproved)
+        {
+            if (await ConfirmAsync("Are you sure, you want to approve this booking?"))
+            {
+                var result = await BookingService.ApproveBookingAsync(booking.Id);
+                if (!result.IsSuccess)
+                {
+                    await AlertAsync(result.ErrorMessage ?? "Error in cancelling the booking");
+                }
+                else
+                {
+                    await _bookingsGrid.RefreshDataAsync();
+                }
+            }
+        }
+    }
+
+    private async Task CancelBookingAsync(GetBookingModel booking)
+    {
+        if (booking.CanBeCancelled)
+        {
+            if (await ConfirmAsync("Are you sure, you want to cancel this booking?"))
+            {
+                var reason = await JsRuntime.InvokeAsync<string?>("window.prompt", "Cancellation Reason: ");
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    await AlertAsync("Cancellation reason is required.");
+                    return;
+                }
+                var result = await BookingService.CancelBookingAsync(booking.Id, reason);
+                if (!result.IsSuccess)
+                {
+                    await AlertAsync(result.ErrorMessage ?? "Error in approving the booking");
+                }
+                else
+                {
+                    await _bookingsGrid.RefreshDataAsync();
+                }
+            }
+        }
+    }
+
+}

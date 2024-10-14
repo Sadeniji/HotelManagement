@@ -1,6 +1,7 @@
 ﻿using HotelManagement.Data;
 using HotelManagement.Data.Entities;
 using HotelManagement.Models;
+using HotelManagement.Models.Public;
 using Microsoft.EntityFrameworkCore;
 
 namespace HotelManagement.Services;
@@ -15,6 +16,7 @@ public interface IRoomTypeService
     Task<Room[]> GetRoomsAsync(Ulid roomTypeId);
     Task<MethodResult<Room>> CreateRoomAsync(Room room);
     Task<MethodResult> DeleteRoomAsync(Ulid roomId);
+    Task<MethodResult> AssignRoomToBookingAsync(Ulid bookingId, Ulid roomId);
 }
 
 public class RoomTypeService(IDbContextFactory<ApplicationDbContext> contextFactory) : IRoomTypeService
@@ -203,4 +205,41 @@ public class RoomTypeService(IDbContextFactory<ApplicationDbContext> contextFact
         return true;
     }
 
+    public async Task<MethodResult> AssignRoomToBookingAsync(Ulid bookingId, Ulid roomId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var room = await context.Rooms.FirstOrDefaultAsync(r => r.Id == roomId && !r.IsDeleted);
+
+        if (room is  null)
+        {
+            return "Invalid request";
+        }
+
+        if (!room.IsAvailable)
+        {
+            return "Room is not available";
+        }
+
+        var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+
+        if (booking is null)
+        {
+            return "Invalid request";
+        }
+
+        if (booking.RoomId.HasValue)
+        {
+            var existingRoom = await context.Rooms.FirstOrDefaultAsync(b => b.Id == booking.RoomId.Value);
+
+            if (existingRoom is not null)
+            {
+                existingRoom.IsAvailable = true;
+            }
+        }
+
+        booking.RoomId = roomId;
+        room.IsAvailable = false;
+        await context.SaveChangesAsync();
+        return true;
+    }
 }

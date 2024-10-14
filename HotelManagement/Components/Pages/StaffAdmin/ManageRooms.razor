@@ -16,7 +16,7 @@
             </NavLink>
             Manage Rooms <small>[@Name]</small>
         </h1>
-        <button type="button" class="btn btn-sm btn-primary" @onclick="OpenCreateRoomModal">+ Add New Room</button>
+        <button type="button" class="btn btn-sm btn-primary" @onclick="() => _showCreateRoomDialog = true">+ Add New Room</button>
     </div>
     <hr/>
     <div class="table-responsive">
@@ -67,12 +67,11 @@
     </div>
 </div>
 
-<dialog id="create-room-dialog" style="min-width: 300px;">
-    <div class="d-flex justify-content-between align-items-center">
-        <h4 class="m-0">Create Room</h4>
-        <button class="btn btn-danger btn-sm" @onclick="CloseRoomModal">X</button>
-    </div>
-    <hr/>
+<DialogComponent 
+    Title="Create Room" 
+    DialogId="@DialogId" 
+    Show="_showCreateRoomDialog" 
+    OnCloseModal="() => _showCreateRoomDialog = false">
     <EditForm Model="_createRoomModel" OnValidSubmit="CreateRoomAsync">
         <DataAnnotationsValidator/>
         <div class="mb-3">
@@ -90,13 +89,22 @@
             <button type="submit" class="btn btn-sm btn-primary">Create Room</button>
         </div>
     </EditForm>
-</dialog>
+</DialogComponent>
 
-<style>
+@* <dialog id="create-room-dialog" style="min-width: 300px;">
+    <div class="d-flex justify-content-between align-items-center">
+        <h4 class="m-0">Create Room</h4>
+        <button class="btn btn-danger btn-sm" @onclick="CloseRoomModal">X</button>
+    </div>
+    <hr/>
+
+</dialog>
+ *@
+@* <style>
     ::backdrop {
         background-color: rgba(228, 145, 20, 0.5);
     }
-</style>
+</style> *@
 @code {
     [Parameter] 
     public string RoomTypeIdRaw { get; set; }
@@ -111,6 +119,8 @@
     private Room[] _rooms = [];
 
     private Ulid RoomTypeId => string.IsNullOrWhiteSpace(RoomTypeIdRaw) ? Ulid.Empty : Ulid.Parse(RoomTypeIdRaw);
+
+    private bool _showCreateRoomDialog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -133,15 +143,11 @@
         {
             _rooms = [.._rooms, result.Data];
             _createRoomModel = new();
-            await CloseRoomModal();
+            _showCreateRoomDialog = false;
             return;
         }
         await JsRuntime.InvokeVoidAsync("window.alert", result.ErrorMessage ?? "Error in creating room.");
     }
-
-    private async Task CloseRoomModal() => await JsRuntime.InvokeVoidAsync("window.closeModal", DialogId);
-
-    private async Task OpenCreateRoomModal() => await JsRuntime.InvokeVoidAsync("window.showModal", DialogId);
 
     private async Task HandleIsAvailabilityChange(Room room)
     {
