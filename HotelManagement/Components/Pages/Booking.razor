@@ -221,7 +221,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var roomTypesTask = RoomsService.GetRoomTypesLookup();
+        var roomTypesTask = RoomsService.GetRoomTypesLookup(); 
 
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
 
@@ -366,7 +366,7 @@
         var domain = NavigationManager.BaseUri.TrimEnd('/');
         var roomTypeName = _roomTypes.First(rt => rt.Id == _model.RoomTypeId).Name;
 
-        var paymentModel = new PaymentModel(bookingId, roomTypeName, NumberOfDays, _price);
+        var paymentModel = new PaymentModel(bookingId, roomTypeName, NumberOfDays, TotalAmount);
         var paymentUrl = await PaymentService.GeneratePaymentUrl(paymentModel, _userId, domain);
 
         NavigationManager.NavigateTo(paymentUrl);

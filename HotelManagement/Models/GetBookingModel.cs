@@ -23,4 +23,6 @@ public class GetBookingModel
     public bool IsRoomNumberAssigned => Status is BookingStatus.Booked or BookingStatus.PaymentSuccess;
     public bool CanBeApproved => Status == BookingStatus.PaymentSuccess;
     public bool CanBeCancelled => Status != BookingStatus.PaymentCancelled && Status != BookingStatus.Cancelled;
+    public bool CanMakePayment => (Status is BookingStatus.PaymentCancelled or BookingStatus.Pending) 
+                                  && CheckInDate >= DateOnly.FromDateTime(DateTime.Today);
 }

@@ -1,4 +1,6 @@
-﻿using HotelManagement.Data;
+﻿using System.Linq.Expressions;
+using HotelManagement.Constants;
+using HotelManagement.Data;
 using HotelManagement.Data.Entities;
 using HotelManagement.Models;
 using HotelManagement.Models.Public;
@@ -11,9 +13,12 @@ public interface IBookingsService
     Task<MethodResult<Ulid>> MakeBookingAsync(BookingModel bookingModel, string userId);
     Task<PagedResult<GetBookingModel>> GetBookingsAsync(int startIndex, int pageSize);
     Task<MethodResult> ApproveBookingAsync(Ulid bookingId);
-    Task<MethodResult> CancelBookingAsync(Ulid bookingId, string reason);
+    Task<MethodResult> CancelBookingAsync(Ulid bookingId, string reason, string? userId = null);
+    Task<PagedResult<GetBookingModel>> GetGuestBookingsAsync(string guestId, BookingType bookingType, int startIndex, int pageSize);
 }
-public class BookingsService(IDbContextFactory<ApplicationDbContext> contextFactory, IRoomTypeService roomTypeService, ILogger<BookingsService> logger) : IBookingsService
+public class BookingsService(IDbContextFactory<ApplicationDbContext> contextFactory, 
+                            IRoomTypeService roomTypeService, 
+                            ILogger<BookingsService> logger) : IBookingsService
 {
     public async Task<MethodResult<Ulid>> MakeBookingAsync(BookingModel bookingModel, string userId)
     {
@@ -120,7 +125,7 @@ public class BookingsService(IDbContextFactory<ApplicationDbContext> contextFact
         return true;
     }
 
-    public async Task<MethodResult> CancelBookingAsync(Ulid bookingId, string reason)
+    public async Task<MethodResult> CancelBookingAsync(Ulid bookingId, string reason, string? userId = null)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
 
@@ -137,9 +142,56 @@ public class BookingsService(IDbContextFactory<ApplicationDbContext> contextFact
         }
 
         booking.Status = BookingStatus.Cancelled;
-        booking.Remarks += Environment.NewLine + $"Cancelled by Staff/Admin. Reason: {reason}";
+        booking.Remarks += Environment.NewLine + 
+                           $"Cancelled by {(userId == booking.GuestId ? "Guest." : "Staff/Admin.")} Reason: {reason}";
         booking.ModifiedOn = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return true;
     }
+
+    public async Task<PagedResult<GetBookingModel>> GetGuestBookingsAsync(string guestId, BookingType bookingType, int startIndex, int pageSize)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var query = context.Bookings.Where(b => b.GuestId == guestId);
+
+        var now = DateOnly.FromDateTime(DateTime.Now);
+
+        query = bookingType switch
+        {
+            BookingType.Upcoming => query.Where(b => b.CheckInDate > now),
+            BookingType.Ongoing => query.Where(b => b.CheckInDate == now  || b.CheckOutDate == now),
+            BookingType.Past => query.Where(b => b.CheckInDate < now),
+        };
+
+        var totalCount = await query.CountAsync();
+
+        var bookings = await query.OrderByDescending(b => b.CheckInDate)
+            .Select(_bookingModelSelector)
+            .Skip(startIndex)
+            .Take(pageSize)
+            .ToArrayAsync();
+
+        return new PagedResult<GetBookingModel>(totalCount, bookings);
+    }
+
+    private static Expression<Func<Booking, GetBookingModel>> _bookingModelSelector =
+        b => new GetBookingModel
+        {
+            Id = b.Id,
+            GuestId = b.GuestId,
+            GuestName = b.Guest.FullName,
+            RoomTypeId = b.RoomTypeId,
+            RoomTypeName = b.RoomType.Name,
+            SpecialRequest = b.SpecialRequest,
+            Status = b.Status,
+            BookedOn = b.BookedOn,
+            RoomId = b.RoomId,
+            RoomNumber = (b.RoomId == null || b.RoomId == Ulid.Empty) ? "" : b.Room.RoomNumber,
+            Adult = b.Adult,
+            Children = b.Children,
+            CheckInDate = b.CheckInDate,
+            CheckOutDate = b.CheckOutDate,
+            Remarks = b.Remarks,
+            TotalAmount = b.TotalAmount
+        };
 }

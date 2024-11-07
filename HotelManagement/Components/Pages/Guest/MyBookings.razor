@@ -1,0 +1,218 @@
+﻿@page "/guest/my-bookings"
+@using HotelManagement.Services
+@using Microsoft.AspNetCore.Components.QuickGrid
+
+@rendermode @(new InteractiveServerRenderMode(prerender:false))
+
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IBookingsService BookingService
+@inject IPaymentService PaymentService
+@inject IJSRuntime JsRuntime
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1>My Bookings</h1>
+    </div>
+    <hr/>
+    <div class="row">
+        <div class="col-sm-8"></div>
+        <div class="col-sm-4">
+            <div class="d-flex justify-content-end">
+                <input type="radio" class="btn-check" name="bookings-type" id="upcoming" 
+                       checked="@(_selectedBookingType == BookingType.Upcoming)"
+                       @onchange="() => ChangeBookingTypeAsync(BookingType.Upcoming)"/>
+                <label class="btn btn-outline-primary" for="upcoming">Upcoming</label>
+                
+                <input type="radio" class="btn-check" name="bookings-type" id="ongoing" 
+                       checked="@(_selectedBookingType == BookingType.Ongoing)"
+                       @onchange="() => ChangeBookingTypeAsync(BookingType.Ongoing)" />
+                <label class="btn btn-outline-primary" for="ongoing">Ongoing</label>
+                
+                <input type="radio" class="btn-check" name="bookings-type" id="past" 
+                       checked="@(_selectedBookingType == BookingType.Past)" 
+                       @onchange="() => ChangeBookingTypeAsync(BookingType.Past)" />
+                <label class="btn btn-outline-primary" for="past">Past</label>
+            </div>
+        </div>
+    </div>
+    <div class="table-responsive">
+        @if (_noDataFound)
+        {
+            <h3 class="text-center">No Bookings found.</h3>
+        }
+        <QuickGrid ItemsProvider="_bookingsProvider" @ref="_bookingsGrid" Pagination="_paginationState" Class="table table-striped">
+            <PropertyColumn Property="b => b.Id" />
+            <PropertyColumn Property="b => b.RoomTypeName" Title="Room Type" />
+            <TemplateColumn Title="Room Number">
+                @if (context.RoomId == null || context.RoomId == Ulid.Empty)
+                {
+                    <label class="d-block">No Room Assigned</label>
+                }
+                else
+                {
+                    <label class="d-block">@context.RoomNumber</label>
+                }
+            </TemplateColumn>
+            <PropertyColumn Property="b => b.BookedOn" Title="Booked On" Format="dd-MM-yy hh:mm:ss" />
+            <PropertyColumn Property="b => b.CheckInDate" Title="Check-in" Format="dd-MM-yy" />
+            <PropertyColumn Property="b => b.CheckOutDate" Title="Check-out" Format="dd-MM-yy" />
+            <PropertyColumn Property="b => b.Adult" />
+            <PropertyColumn Property="b => b.Children" />
+            <PropertyColumn Property="b => b.SpecialRequest" Title="Special Request" />
+            <PropertyColumn Property="b => b.Status" />
+            <PropertyColumn Property="b => b.Remarks" Class="remark-column" />
+            <TemplateColumn Class="grid-action-column">
+            </TemplateColumn>
+            <TemplateColumn Class="grid-action-column">
+                <button type="button" class="btn btn-sm btn-success"
+                        disabled="@(!context.CanMakePayment)"
+                        @onclick="() => MakePaymentAsync(context)">
+                    Pay Now
+                </button>
+                <button type="button" class="btn btn-sm btn-danger"
+                        disabled="@(!context.CanBeCancelled)" @onclick="() => CancelBookingAsync(context)">
+                    Cancel
+                </button>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+    <Paginator State="_paginationState" />
+</div>
+
+@if (_isLoading)
+{
+    <Loader LoadingText="@_loadingText" />
+}
+
+<style type="text/css">
+    .btn {
+        text-transform: capitalize;
+    }
+
+    .grid-action-column {
+        min-width: 190px;
+    }
+
+    .remark-column {
+        min-width: 240px;
+    }
+</style>
+
+@code{
+
+    private BookingType _selectedBookingType = BookingType.Upcoming;
+
+    private int currentRowIndex = 0; // Initialize the row index
+    private bool _isLoading;
+    private string _loadingText = "";
+    private GridItemsProvider<GetBookingModel>? _bookingsProvider;
+    private QuickGrid<GetBookingModel>? _bookingsGrid;
+    private const int PageSize = 10;
+
+    private PaginationState _paginationState = new PaginationState { ItemsPerPage = PageSize };
+
+    private bool _noDataFound;
+
+    protected override void OnInitialized()
+    {
+        _bookingsProvider = async (GridItemsProviderRequest<GetBookingModel> request) =>
+        {
+            _loadingText = "Fetching bookings";
+            _isLoading = true;
+            StateHasChanged();
+            
+            // fetch booking from db
+            var guestId = await GetUserIdAsync();
+            if (guestId is null)
+            {
+                return default;
+            }
+            var result = await BookingService.GetGuestBookingsAsync(guestId, _selectedBookingType, request.StartIndex, request.Count ?? PageSize);
+
+            _isLoading = false;
+            StateHasChanged();
+
+            _noDataFound = result.TotalCount == 0;
+
+            return GridItemsProviderResult.From<GetBookingModel>(result.Records, result.TotalCount);
+        };
+    }
+
+    private async Task ChangeBookingTypeAsync(BookingType bookingType)
+    {
+        _selectedBookingType = bookingType;
+        await _bookingsGrid.RefreshDataAsync();
+    }
+
+    private async Task<string?> GetUserIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User?.Identity?.IsAuthenticated == true)
+        {
+            return authState.User.GetUserId();
+        }
+
+        NavigationManager.NavigateTo("/account/login");
+        return authState.User?.Identity?.IsAuthenticated == true ? authState.User.GetUserId() : null;
+    }
+
+    private async Task MakePaymentAsync(GetBookingModel booking)
+    {
+        if (booking.CanMakePayment)
+        {
+            var userId = await GetUserIdAsync();
+            if (userId == null)
+            {
+                return;
+            }
+            _loadingText = "Processing";
+            _isLoading = true;
+            await PayNowAsync(booking, userId);
+        }
+    }
+    private async Task CancelBookingAsync(GetBookingModel booking)
+    {
+        if (booking.CanBeCancelled)
+        {
+            if (await JsRuntime.ConfirmAsync("Are you sure, you want to cancel this booking?"))
+            {
+                var guestId = await GetUserIdAsync();
+                if (guestId == null)
+                {
+                    return;
+                }
+                var reason = await JsRuntime.PromptAsync("Cancellation Reason: ");
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    await JsRuntime.AlertAsync("Cancellation reason is required.");
+                    return;
+                }
+                var result = await BookingService.CancelBookingAsync(booking.Id, reason, guestId);
+                if (!result.IsSuccess)
+                {
+                    await JsRuntime.AlertAsync(result.ErrorMessage ?? "Error in approving the booking");
+                }
+                else
+                {
+                    await _bookingsGrid.RefreshDataAsync();
+                }
+            }
+        }
+    }
+
+    private async Task PayNowAsync(GetBookingModel booking, string userId)
+    {
+        var domain = NavigationManager.BaseUri.TrimEnd('/');
+        var roomTypeName = booking.RoomTypeName;
+
+        var numberOfDays = booking.CheckOutDate.DayNumber - booking.CheckInDate.DayNumber;
+        var paymentModel = new PaymentModel(booking.Id, roomTypeName, numberOfDays, booking.TotalAmount);
+        var paymentUrl = await PaymentService.GeneratePaymentUrl(paymentModel, userId, domain);
+
+        NavigationManager.NavigateTo(paymentUrl);
+    }
+
+
+}

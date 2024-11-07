@@ -36,7 +36,7 @@ public class PaymentService(IDbContextFactory<ApplicationDbContext> contextFacto
         await context.Payments.AddAsync(paymentEntity);
         await context.SaveChangesAsync();
 
-        var totalAmount = model.Price * model.NumberOfDays;
+        var totalAmount = model.TotalAmount;
 
         SessionLineItemOptions[] lineItems =
         [
@@ -50,7 +50,7 @@ public class PaymentService(IDbContextFactory<ApplicationDbContext> contextFacto
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
                         Name = model.RoomTypeName,
-                        Description = $"Booking a {model.RoomTypeName} Room for {model.NumberOfDays} Days at {model.Price:c}/night"
+                        Description = $"Booking a {model.RoomTypeName} Room for {model.NumberOfDays} Days at total cost {model.TotalAmount:c}/night(s)"
                     }
                 }
             }

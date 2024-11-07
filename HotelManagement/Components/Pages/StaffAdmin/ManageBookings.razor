@@ -128,13 +128,13 @@
 
         if (!(rooms?.Any() ?? false))
         {
-            await AlertAsync("There are no rooms for this room type");
+            await JsRuntime.AlertAsync("There are no rooms for this room type");
             return;
         }
 
         if (!rooms.Any(r => r.IsAvailable))
         {
-            await AlertAsync("There are no rooms available for this room type.");
+            await JsRuntime.AlertAsync("There are no rooms available for this room type.");
             return;
         }
 
@@ -142,8 +142,8 @@
         _bookingModel = booking;
     }
 
-    private async Task AlertAsync(string message) => await JsRuntime.InvokeVoidAsync("window.alert", message);
-    private async Task<bool> ConfirmAsync(string message) => await JsRuntime.InvokeAsync<bool>("window.confirm", message);
+    // private async Task AlertAsync(string message) => await JsRuntime.InvokeVoidAsync("window.alert", message);
+    // private async Task<bool> ConfirmAsync(string message) => await JsRuntime.InvokeAsync<bool>("window.confirm", message);
 
     private void HandleAssignRoomModalClose()
     {
@@ -160,7 +160,7 @@
 
             if (!result.IsSuccess)
             {
-                await AlertAsync($"Error in assigning/changing room. {result.ErrorMessage}");
+                await JsRuntime.AlertAsync($"Error in assigning/changing room. {result.ErrorMessage}");
                 return;
             }
 
@@ -175,12 +175,12 @@
     {
         if (booking.CanBeApproved)
         {
-            if (await ConfirmAsync("Are you sure, you want to approve this booking?"))
+            if (await JsRuntime.ConfirmAsync("Are you sure, you want to approve this booking?"))
             {
                 var result = await BookingService.ApproveBookingAsync(booking.Id);
                 if (!result.IsSuccess)
                 {
-                    await AlertAsync(result.ErrorMessage ?? "Error in cancelling the booking");
+                    await JsRuntime.AlertAsync(result.ErrorMessage ?? "Error in cancelling the booking");
                 }
                 else
                 {
@@ -194,18 +194,18 @@
     {
         if (booking.CanBeCancelled)
         {
-            if (await ConfirmAsync("Are you sure, you want to cancel this booking?"))
+            if (await JsRuntime.ConfirmAsync("Are you sure, you want to cancel this booking?"))
             {
-                var reason = await JsRuntime.InvokeAsync<string?>("window.prompt", "Cancellation Reason: ");
+                var reason = await JsRuntime.PromptAsync("Cancellation Reason: ");
                 if (string.IsNullOrWhiteSpace(reason))
                 {
-                    await AlertAsync("Cancellation reason is required.");
+                    await JsRuntime.AlertAsync("Cancellation reason is required.");
                     return;
                 }
                 var result = await BookingService.CancelBookingAsync(booking.Id, reason);
                 if (!result.IsSuccess)
                 {
-                    await AlertAsync(result.ErrorMessage ?? "Error in approving the booking");
+                    await JsRuntime.AlertAsync(result.ErrorMessage ?? "Error in approving the booking");
                 }
                 else
                 {
