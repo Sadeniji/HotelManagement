@@ -12,6 +12,7 @@ public interface IUserService
     Task<MethodResult> UpdateUserProfileAsync(ProfileModel model, RoleType? roleType, CancellationToken cancellationToken);
     Task<PagedResult<UserDisplayModel>> GetUsersAsync(int startIndex, int pageSize, RoleType? roleType = null);
     Task<ProfileModel?> GetUserProfileDetailsAsync(string userId, CancellationToken cancellationToken);
+    Task<MethodResult> ChangePasswordAsync(ChangePasswordModel changePasswordModel, string userId);
 }
 
 public class UserService(
@@ -103,15 +104,7 @@ public class UserService(
         };
         
     }
-
-    private IQueryable<ApplicationUser> GetUser(string userId, RoleType? roleType = null)
-    {
-        var query = userManager.Users.Where(u => u.Id == userId);
-
-        return roleType != null ? query.Where(u => u.RoleName == roleType.ToString()) :  query;
-        
-    }
-
+    
     public async Task<MethodResult<ApplicationUser>> CreateUserAsync(ApplicationUser user, string email, string password)
     {
         var existingUser = await userManager.FindByEmailAsync(email);
@@ -142,6 +135,25 @@ public class UserService(
         return user;
     }
 
+    public async Task<MethodResult> ChangePasswordAsync(ChangePasswordModel changePasswordModel, string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+
+        if (user == null)
+        {
+            return "Invalid request";
+        }
+        
+        var changePasswordResult = await userManager.ChangePasswordAsync(user, changePasswordModel.CurrentPassword, changePasswordModel.NewPassword);
+        
+        if (!changePasswordResult.Succeeded)
+        {
+            return $"Error: {string.Join(",", changePasswordResult.Errors.Select(error => error.Description))}";
+        }
+
+        return true;
+    }
+
     private IUserEmailStore<ApplicationUser> GetEmailStore()
     {
         if (!userManager.SupportsUserEmail)
@@ -150,5 +162,12 @@ public class UserService(
         }
 
         return (IUserEmailStore<ApplicationUser>)userStore;
+    }
+    private IQueryable<ApplicationUser> GetUser(string userId, RoleType? roleType = null)
+    {
+        var query = userManager.Users.Where(u => u.Id == userId);
+
+        return roleType != null ? query.Where(u => u.RoleName == roleType.ToString()) :  query;
+        
     }
 }
